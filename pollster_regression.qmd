@@ -1,0 +1,81 @@
+---
+title: "PollsterRegressionTutorial"
+format: pdf
+editor: visual
+---
+
+## Introduction
+
+Using Cohn (2016) we will build a simplified version of their model. Afterwards, we will obtain some recent relevant data, estimate the model and discuss the choice between types of regression. For this paper, we will discuss the rationale behind using logistic regression, poisson regression and negative binomial regression for election data analysis.
+
+## Simplified Model
+
+Polling data more often than not is based on categorical outcomes, as a result of this, logistic regression will be used to build the simplified model. We will create a simplified logistic regression model in R to model this properly.
+
+```{r echo=FALSE}
+suppressPackageStartupMessages(library(dplyr))
+library(dplyr)
+
+set.seed(456)
+
+# Here we mock a poll_data.csv file that NYT would have used for their logistic regression model
+N <- 1000
+poll_data <- tibble(
+  candidate_binary = sample(0:1, N, replace = TRUE), # Binary outcome: 0 or 1
+  age = sample(18:100, N, replace = TRUE), # Age range from 18 to 100
+  gender = sample(c("Male", "Female"), N, replace = TRUE), # Gender
+  education = sample(c("High School", "Bachelor", "Master", "PhD"), N, replace = TRUE), # Education levels
+  race = sample(c("White", "Black", "Hispanic", "Asian", "Other"), N, replace = TRUE), # Race
+  voter_history = sample(0:1, N, replace = TRUE) # Voter history: 0 or 1
+)
+
+poll_data <- 
+model <- glm(candidate_binary ~ age + gender + education + race + voter_history,
+             family = binomial(link = "logit"), data = poll_data)
+```
+
+The model outlined above utilizes age, gender, education , race and voter history to build a logistic regression model. This is a simplified model of the one built by Stanford University to determine the likeliness of a candidate winning in the 2016 election.
+
+## Data set
+
+The data set we will be using is sourced from <https://results.elections.myflorida.com/downloadresults.asp?ElectionDate=11/8/2022&DATAMODE=> and tracks the general election results during the year 2022 in the state of Florida. Despite the format, we will manually convert it to a csv file so that we can read the contents fluently.
+
+```{r echo=FALSE}
+election_data <- read.csv("Florida_General_Election_Data.csv")
+head(election_data)
+```
+
+## Estimating The Model
+
+First, consider that the data used in the New York Times article is most likely proprietary or contains sensitive information not available to the public. The data outlined above is the closest public election data that we could find, we will tweak our original logistical regression model to fit this new data and run other regressions on.
+
+Below, we build the models for the logistic, negative binomial and poisson regressions using the data set. We append an extra column called RepWin that counts the number of representatives for each party code. This is a binary indicator that we will use to prepare for using the logistic regression model.
+
+```{r echo=FALSE}
+
+suppressPackageStartupMessages(library(MASS))
+library(MASS)
+library(knitr)
+
+
+
+election_data$DemWin <- ifelse(election_data$PartyCode == "DEM", 1, 0)
+logistic_model <- glm(DemWin ~ CountyName + OfficeDesc, family = binomial(link = "logit"), data = election_data)
+
+poisson_model <- glm(CanVotes ~ CountyName + OfficeDesc, family = poisson(link = "log"), data = election_data)
+
+neg_binomial_model <- glm.nb(CanVotes ~ CountyName + OfficeDesc, data = election_data)
+
+# Predict Estimates For The Logistic Model
+election_data$predicted_probability_dem_win <- predict(logistic_model, newdata = election_data, type = "response")
+
+pred_probabilities <- data.frame(CountyName = election_data$CountyName, PredictedProbabilityDemWin = election_data$predicted_probability_dem_win)
+
+kable(head(pred_probabilities), caption = "Predicted Probabilities of Democratic Winning by County")
+```
+
+## Discussion
+
+The models above offer a very simplified view of the different regression techniques that can be applied to election data. Logistic regression is best used for binary outcomes, predicting a win or lose situation. Poisson and negative binomial regressions could model aspects like number of votes. This particular example highlights that Logistic Regression models may be best to use for these types of scenarios.
+
+However, this process also underscores the complexity involved in predicting elections, there are several different factors to account for in any prediction. Influenced by myriads of factors, elections cannot be modeled by simplistic models that will inadequately capture all determinants in an election. Due to the limited predictive power of the logistic model in this assignment, the predictor variables CountyName and OfficeDesc highly likely oversimplify the electoral dynamics in the 2022 general election of Florida. Critical evaluation of both models and data are necessary to undertake such a consequential forecast.
